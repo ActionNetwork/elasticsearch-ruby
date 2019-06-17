@@ -23,6 +23,15 @@ module Elasticsearch
                 when 'HEAD'
                 when 'GET', 'POST', 'PUT', 'DELETE'
                   connection.connection.put_data = __convert_to_json(body) if body
+
+                  if headers
+                    if connection.connection.headers
+                      connection.connection.headers.merge!(headers)
+                    else
+                      connection.connection.headers = headers
+                    end
+                  end
+
                 else raise ArgumentError, "Unsupported HTTP method: #{method}"
               end
 
@@ -32,7 +41,7 @@ module Elasticsearch
               response_headers['content-type'] = 'application/json' if connection.connection.header_str =~ /\/json/
 
               Response.new connection.connection.response_code,
-                           connection.connection.body_str,
+                           decompress_response(connection.connection.body_str),
                            response_headers
             end
           end
@@ -74,6 +83,19 @@ module Elasticsearch
               ::Curl::Err::SendError,
               ::Curl::Err::TimeoutError
             ]
+          end
+
+          private
+
+          def user_agent_header(client)
+            @user_agent ||= begin
+              meta = ["RUBY_VERSION: #{RUBY_VERSION}"]
+              if RbConfig::CONFIG && RbConfig::CONFIG['host_os']
+                meta << "#{RbConfig::CONFIG['host_os'].split('_').first[/[a-z]+/i].downcase} #{RbConfig::CONFIG['target_cpu']}"
+              end
+              meta << "Curb #{Curl::CURB_VERSION}"
+              "elasticsearch-ruby/#{VERSION} (#{meta.join('; ')})"
+            end
           end
         end
 

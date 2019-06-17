@@ -139,6 +139,27 @@ module Elasticsearch
               ::Manticore::ResolutionFailure
             ]
           end
+
+          private
+
+          def apply_headers(request_options, options)
+            headers = (options && options[:headers]) || {}
+            headers[CONTENT_TYPE_STR] = find_value(headers, CONTENT_TYPE_REGEX) || DEFAULT_CONTENT_TYPE
+            headers[USER_AGENT_STR] = find_value(headers, USER_AGENT_REGEX) || user_agent_header
+            headers[ACCEPT_ENCODING] = GZIP if use_compression?
+            request_options.merge!(headers: headers)
+          end
+
+          def user_agent_header
+            @user_agent ||= begin
+              meta = ["RUBY_VERSION: #{JRUBY_VERSION}"]
+              if RbConfig::CONFIG && RbConfig::CONFIG['host_os']
+                meta << "#{RbConfig::CONFIG['host_os'].split('_').first[/[a-z]+/i].downcase} #{RbConfig::CONFIG['target_cpu']}"
+              end
+              meta << "Manticore #{::Manticore::VERSION}"
+              "elasticsearch-ruby/#{VERSION} (#{meta.join('; ')})"
+            end
+          end
         end
       end
     end
