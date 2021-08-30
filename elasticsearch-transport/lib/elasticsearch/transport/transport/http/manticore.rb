@@ -65,8 +65,11 @@ module Elasticsearch
           #
           def perform_request(method, path, params={}, body=nil)
             super do |connection, url|
-              params[:body] = __convert_to_json(body) if body
-              params = params.merge @request_options
+              body = body ? __convert_to_json(body) : nil
+              body, headers = compress_request(body, @request_options[:headers])
+
+              params[:body] = body if body
+              params[:headers] = headers if headers
               case method
               when "GET"
                 resp = connection.connection.get(url, params)

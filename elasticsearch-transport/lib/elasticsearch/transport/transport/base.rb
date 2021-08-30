@@ -207,7 +207,7 @@ module Elasticsearch
         # @api private
         #
         def __convert_to_json(o=nil, options={})
-          o = o.is_a?(String) ? o : serializer.dump(o, options)
+          o.is_a?(String) ? o : serializer.dump(o, options)
         end
 
         # Returns a full URL based on information from host
@@ -257,9 +257,8 @@ module Elasticsearch
               params = connection.connection.params.merge(params.to_hash)
             end
 
-            url        = connection.full_url(path, params)
-
-            response   = block.call(connection, url)
+            url      = connection.full_url(path, params)
+            response = block.call(connection, url)
 
             connection.healthy! if connection.failures > 0
 
@@ -343,17 +342,38 @@ module Elasticsearch
 
         USER_AGENT_STR = 'User-Agent'.freeze
         USER_AGENT_REGEX = /user\-?\_?agent/
+        ACCEPT_ENCODING = 'Accept-Encoding'.freeze
+        CONTENT_ENCODING = 'Content-Encoding'.freeze
         CONTENT_TYPE_STR = 'Content-Type'.freeze
         CONTENT_TYPE_REGEX = /content\-?\_?type/
         DEFAULT_CONTENT_TYPE = 'application/json'.freeze
         GZIP = 'gzip'.freeze
-        ACCEPT_ENCODING = 'Accept-Encoding'.freeze
         GZIP_FIRST_TWO_BYTES = '1f8b'.freeze
         HEX_STRING_DIRECTIVE = 'H*'.freeze
         RUBY_ENCODING = '1.9'.respond_to?(:force_encoding)
 
+        def compress_request(body, headers)
+          if body
+            headers ||= {}
+
+            if gzipped?(body)
+              headers[CONTENT_ENCODING] = GZIP
+            elsif use_compression?
+              headers[CONTENT_ENCODING] = GZIP
+              gzip = Zlib::GzipWriter.new(StringIO.new)
+              gzip << body
+              body = gzip.close.string
+            else
+              headers.delete(CONTENT_ENCODING)
+            end
+          elsif headers
+            headers.delete(CONTENT_ENCODING)
+          end
+
+          [body, headers]
+        end
+
         def decompress_response(body)
-          return body unless use_compression?
           return body unless gzipped?(body)
 
           io = StringIO.new(body)
@@ -366,6 +386,7 @@ module Elasticsearch
         end
 
         def gzipped?(body)
+          return unless body
           body[0..1].unpack(HEX_STRING_DIRECTIVE)[0] == GZIP_FIRST_TWO_BYTES
         end
 
